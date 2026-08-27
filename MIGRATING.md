@@ -278,17 +278,21 @@ Details: [Automatic JSON handling with `enable_structured_type_json`](README.md#
 defaulted to `True` in 1.x and in 2.0.0a0). This changes the **generated SQL**
 for `/` and `//` on SQLAlchemy column expressions:
 
-| Python expression | Old default (`=True`) | New default (`=False`) |
+| Python expression | `force_div_is_floordiv=False` (default) | `force_div_is_floordiv=True` (deprecated) |
 | --- | --- | --- |
-| `col1 / col2` | `col1 / CAST(col2 AS NUMERIC)` | `col1 / col2` |
-| `col1 // col2` | `col1 / col2` | `FLOOR(col1 / col2)` |
+| `col1 / col2` | `col1 / col2` | `FLOOR(col1 / col2)` |
+| `col1 // col2` | `FLOOR(col1 / col2)` | `FLOOR(col1 / col2)` |
 
-- `/` now performs standard true division (Snowflake `/` already returns a
-  fractional result) and no longer casts the denominator to `NUMERIC`.
-- `//` now correctly floors; previously it compiled to plain `/`, which was
-  **not** floor division.
+- `/` with the default performs standard true division — Snowflake's `/`
+  already returns a fractional result, so no cast is needed.
+- `//` always emits `FLOOR(col1 / col2)`; its behaviour is the same regardless
+  of the flag.
+- Setting `force_div_is_floordiv=True` (deprecated) makes `/` emit
+  `FLOOR(col1 / col2)`, honouring the flag's stated semantics. A
+  `DeprecationWarning` is raised on every compiled expression and the flag will
+  be removed in a future release.
 
-Restore the old behavior explicitly (deprecated — emits a `DeprecationWarning`):
+Restore the floor-division behaviour for `/` explicitly (deprecated — emits a `DeprecationWarning`):
 
 ```python
 create_engine(URL(...), force_div_is_floordiv=True)

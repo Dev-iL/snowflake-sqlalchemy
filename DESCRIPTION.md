@@ -9,6 +9,8 @@ Source code is also available at:
 
 # Unreleased Notes
 
+- Fix `visit_truediv_binary` and `visit_floordiv_binary` for the deprecated `force_div_is_floordiv=True` path: true division (`/`) no longer emits an unnecessary `CAST(right AS NUMERIC)`, and floor division (`//`) on integer/integer pairs now correctly emits `FLOOR(left / right)` instead of plain `left / right` (GH #756).
+
 # Release Notes
 
 - v2.0.0a2 (Aug 20, 2026)
