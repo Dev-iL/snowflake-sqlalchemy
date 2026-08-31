@@ -160,8 +160,6 @@ ILLEGAL_INITIAL_CHARACTERS = frozenset({d for d in string.digits}.union({"$"}))
 # used for quoting identifiers ie. table names, column names, etc.
 ILLEGAL_IDENTIFIERS = frozenset({d for d in string.digits}.union({"_"}))
 
-_DIV_MIGRATION_URL = "https://github.com/snowflakedb/snowflake-sqlalchemy/blob/main/MIGRATING.md#6-division-operators-compile-differently-force_div_is_floordiv"
-
 """
 Overwrite methods to handle Snowflake BCR change:
 https://docs.snowflake.com/en/release-notes/bcr-bundles/2023_04/bcr-1057
@@ -1305,63 +1303,6 @@ class SnowflakeCompiler(compiler.SQLCompiler):
             + " ON "
             # TODO: likely need asfrom=True here?
             + join.onclause._compiler_dispatch(self, from_linter=from_linter, **kwargs)  # type: ignore[union-attr]
-        )
-
-    def visit_truediv_binary(
-        self, binary: BinaryExpression[Any], operator: OperatorType, **kw: Any
-    ) -> str:
-        """Compile the true-division operator (``/``) for Snowflake.
-
-        By default (``force_div_is_floordiv=False``) Snowflake's native ``/``
-        operator is used directly — no ``CAST`` is required because Snowflake
-        always performs true division (GH #756).
-
-        When the deprecated ``force_div_is_floordiv=True`` flag is set the
-        operator is compiled as ``FLOOR(left / right)``, honouring the flag's
-        stated semantics: the caller is explicitly requesting that ``/`` behave
-        as floor division.
-        """
-        if self.dialect.div_is_floordiv:
-            warnings.warn(
-                "force_div_is_floordiv is deprecated and will be removed in a future "
-                "release. When removed, the '/' operator will perform true division "
-                "(i.e. 'a / b' instead of 'FLOOR(a / b)'). Remove "
-                "force_div_is_floordiv=True from your create_engine() call to adopt "
-                f"the default behaviour now. See the migration guide: {_DIV_MIGRATION_URL}",
-                PendingDeprecationWarning,
-                stacklevel=2,
-            )
-            return "FLOOR(%s)" % (
-                self.process(binary.left, **kw)
-                + " / "
-                + self.process(binary.right, **kw)
-            )
-        return (
-            self.process(binary.left, **kw) + " / " + self.process(binary.right, **kw)
-        )
-
-    def visit_floordiv_binary(
-        self, binary: BinaryExpression[Any], operator: OperatorType, **kw: Any
-    ) -> str:
-        """Compile the floor-division operator (``//``) for Snowflake.
-
-        Snowflake has no native floor-division operator; always emit
-        ``FLOOR(left / right)``.  Do not delegate to ``super()``: when
-        ``div_is_floordiv`` is ``True`` the SA base omits ``FLOOR`` for
-        integer/integer pairs (assuming the DB naturally floors), which is
-        wrong for Snowflake (GH #756).
-        """
-        if self.dialect.div_is_floordiv:
-            warnings.warn(
-                "force_div_is_floordiv is deprecated and will be removed in a future "
-                "release. The '//' operator always emits FLOOR(a / b) and is unaffected "
-                "by this flag. Remove force_div_is_floordiv=True from your "
-                f"create_engine() call. See the migration guide: {_DIV_MIGRATION_URL}",
-                PendingDeprecationWarning,
-                stacklevel=2,
-            )
-        return "FLOOR(%s)" % (
-            self.process(binary.left, **kw) + " / " + self.process(binary.right, **kw)
         )
 
     def render_literal_value(self, value: Any, type_: TypeEngine[Any]) -> str:

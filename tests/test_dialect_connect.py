@@ -28,7 +28,6 @@ _DEFAULT_FLAG_PAYLOAD = {
     "case_sensitive_identifiers": False,
     "enable_decfloat": False,
     "enable_structured_type_json": True,
-    "force_div_is_floordiv": False,
 }
 
 
@@ -180,10 +179,6 @@ def _telemetry_payload(dialect, telemetry_client_mock, fake_connection):
             {"enable_decfloat": True},
         ),
         (
-            {"force_div_is_floordiv": True},
-            {"force_div_is_floordiv": True},
-        ),
-        (
             {"enable_structured_type_json": False},
             {"enable_structured_type_json": False},
         ),
@@ -193,20 +188,17 @@ def _telemetry_payload(dialect, telemetry_client_mock, fake_connection):
                 "case_sensitive_identifiers": True,
                 "enable_decfloat": True,
                 "enable_structured_type_json": False,
-                "force_div_is_floordiv": True,
             },
             {
                 "case_sensitive_identifiers": True,
                 "enable_decfloat": True,
                 "enable_structured_type_json": False,
-                "force_div_is_floordiv": True,
             },
         ),
     ],
     ids=[
         "case_sensitive_identifiers_true",
         "enable_decfloat_true",
-        "force_div_is_floordiv_true",
         "enable_structured_type_json_false",
         "all_flipped",
     ],
@@ -225,9 +217,9 @@ def test_connect_telemetry_records_kwarg_flags(
 
     with mock.patch.dict(modules, {"pandas": None}):
         # Some overrides intentionally set now-deprecated legacy values
-        # (force_div_is_floordiv=True / enable_structured_type_json=False),
-        # which emit a DeprecationWarning at construction; suppress it here
-        # since this test asserts telemetry propagation, not the warnings.
+        # (enable_structured_type_json=False), which emit a DeprecationWarning
+        # at construction; suppress it here since this test asserts telemetry
+        # propagation, not the warnings.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
             dialect = SnowflakeDialect(**ctor_kwargs)
@@ -524,8 +516,6 @@ def test_structured_event_records_flags_and_isolation_level(
     assert flags["case_sensitive_identifiers"] is False
     # ``cache_column_metadata`` is a connection param, sourced from cparams.
     assert flags["cache_column_metadata"] is True
-    # New major-release default: legacy floor-division behaviour is off.
-    assert flags["force_div_is_floordiv"] is False
     # Structured event is a superset of the legacy NEW_CONNECTION flags.
     assert flags["enable_structured_type_json"] is True
 

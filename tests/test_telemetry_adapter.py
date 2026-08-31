@@ -23,7 +23,6 @@ def _fake_dialect(**overrides):
         "_case_sensitive_identifiers": False,
         "_enable_decfloat": False,
         "_enable_structured_type_json": True,
-        "force_div_is_floordiv": False,
         "_isolation_level": None,
     }
     attrs.update(overrides)
@@ -158,7 +157,6 @@ def test_new_connection_payload_shape():
     assert payload["enable_decfloat"] is True
     assert payload["case_sensitive_identifiers"] is False
     assert payload["enable_structured_type_json"] is True
-    assert payload["force_div_is_floordiv"] is False
     assert "SQLAlchemy" in payload
     assert "legacy_url_params" not in payload
 
@@ -181,7 +179,6 @@ def test_connection_parameters_payload_flags_include_isolation_and_cache():
         "enable_decfloat",
         "enable_structured_type_json",
         "cache_column_metadata",
-        "force_div_is_floordiv",
         "isolation_level",
     }
 

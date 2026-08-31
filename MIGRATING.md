@@ -54,7 +54,7 @@ temporary `legacy_url_params` shim was removed — review the
 | Use `regexp_match(...)` / `regexp_replace(...)` with `flags=` and are coming from a release **older than 1.10.1** | Review generated SQL — flag rendering was fixed (see [behavioral differences](#behavioral-differences-to-review)). |
 | Pass `legacy_url_params=` or set `SNOWFLAKE_SQLALCHEMY_LEGACY_URL_PARAMS` | Remove it; move blocked connector kwargs to `connect_args=` (see [Breaking changes](#breaking-changes)). |
 | Read semi-structured `VARIANT`/`OBJECT`/`ARRAY` values with `json.loads(...)` | Values now come back as `dict`/`list` by default — see [behavioral difference #5](#5-automatic-json-handling-is-on-by-default-enable_structured_type_json). |
-| Use `/` or `//` on column expressions and assert the compiled SQL or results | Generated SQL changed — see [behavioral difference #6](#6-division-operators-compile-differently-force_div_is_floordiv). |
+| Use `/` or `//` on column expressions and assert the compiled SQL or results | Generated SQL changed — see [behavioral difference #6](#6-force_div_is_floordiv-removed). |
 
 ## Step-by-step upgrade
 
@@ -272,30 +272,26 @@ create_engine(URL(...), enable_structured_type_json=False)
 
 Details: [Automatic JSON handling with `enable_structured_type_json`](README.md#automatic-json-handling-with-enable_structured_type_json).
 
-### 6. Division operators compile differently (`force_div_is_floordiv`)
+### 6. `force_div_is_floordiv` removed
 
-`force_div_is_floordiv` now defaults to **`False`** as of **2.0.0a2** (it
-defaulted to `True` in 1.x and in 2.0.0a0). This changes the **generated SQL**
-for `/` and `//` on SQLAlchemy column expressions:
+The `force_div_is_floordiv` dialect flag was **removed**. The `/` and `//`
+operators now always compile to the correct Snowflake SQL regardless of any
+flag:
 
-| Python expression | `force_div_is_floordiv=False` (default) | `force_div_is_floordiv=True` (deprecated) |
+| Python expression | Generated SQL | Behaviour |
 | --- | --- | --- |
-| `col1 / col2` | `col1 / col2` | `FLOOR(col1 / col2)` |
-| `col1 // col2` | `FLOOR(col1 / col2)` | `FLOOR(col1 / col2)` |
+| `col1 / col2` | `col1 / col2` | True division (Snowflake's native `/`) |
+| `col1 // col2` | `FLOOR(col1 / col2)` | Floor division |
 
-- `/` with the default performs standard true division — Snowflake's `/`
-  already returns a fractional result, so no cast is needed.
-- `//` always emits `FLOOR(col1 / col2)`; its behaviour is the same regardless
-  of the flag.
-- Setting `force_div_is_floordiv=True` (deprecated) makes `/` emit
-  `FLOOR(col1 / col2)`, honouring the flag's stated semantics. A
-  `DeprecationWarning` is raised on every compiled expression and the flag will
-  be removed in a future release.
-
-Restore the floor-division behaviour for `/` explicitly (deprecated — emits a `DeprecationWarning`):
+Passing `force_div_is_floordiv` to `create_engine()` now raises
+`sqlalchemy.exc.ArgumentError`. Remove it from your connection configuration:
 
 ```python
+# Before (removed — raises ArgumentError)
 create_engine(URL(...), force_div_is_floordiv=True)
+
+# After
+create_engine(URL(...))
 ```
 
 Details: SQLAlchemy's
@@ -343,7 +339,7 @@ policy.
 | Type-string comparisons fail after reflection (`VARCHAR(16777216)`) | Use `isinstance()` — see [behavioral difference #3](#3-reflected-type-str-output-includes-snowflake-default-sizes). |
 | `REGEXP_*` SQL changed | Expected; see [behavioral difference #4](#4-regexp_match--regexp_replace-flags-render-as-literals). |
 | Semi-structured reads return `dict`/`list`, or `json.loads(...)` now raises `TypeError` | Expected; drop the manual JSON parsing, or opt out with `enable_structured_type_json=False` (deprecated) — see [behavioral difference #5](#5-automatic-json-handling-is-on-by-default-enable_structured_type_json). |
-| `/` or `//` compiled SQL / results changed | Expected; update expectations, or set `force_div_is_floordiv=True` (deprecated) — see [behavioral difference #6](#6-division-operators-compile-differently-force_div_is_floordiv). |
+| `/` or `//` compiled SQL / results changed | Expected; update expectations, or set `force_div_is_floordiv=True` (deprecated) — see [behavioral difference #6](#6-force_div_is_floordiv-removed). |
 
 ## Further reading
 

@@ -167,11 +167,13 @@ _LEGACY_URL_PARAMS_REMOVED_MSG = (
     f"create_engine(). See the README: {_README_URL}"
 )
 
-_FORCE_DIV_IS_FLOORDIV_DEPRECATION_MSG = (
-    "force_div_is_floordiv=True re-enables the legacy floor-division behaviour, "
-    "which is deprecated and will be removed in a future release. The default is "
-    "now False (standard true division for '/'). Remove the argument to adopt the "
-    f"new default. See the README: {_README_URL}"
+_FORCE_DIV_IS_FLOORDIV_REMOVED_MSG = (
+    "The 'force_div_is_floordiv' option was removed. The '/' operator always "
+    "performs true division and '//' always performs floor division "
+    "(FLOOR(left / right)); no flag is needed. Remove the argument from your "
+    "create_engine() call. See the migration guide: "
+    "https://github.com/snowflakedb/snowflake-sqlalchemy/blob/main/MIGRATING.md"
+    "#6-force_div_is_floordiv-removed"
 )
 
 _ENABLE_STRUCTURED_TYPE_JSON_DEPRECATION_MSG = (
@@ -274,7 +276,6 @@ class SnowflakeDialect(default.DefaultDialect):
 
     def __init__(
         self,
-        force_div_is_floordiv: bool | None = None,
         isolation_level: str | None = SnowflakeIsolationLevel.READ_COMMITTED.value,
         enable_decfloat: bool = False,
         enable_structured_type_json: bool | None = None,
@@ -289,24 +290,17 @@ class SnowflakeDialect(default.DefaultDialect):
         if "legacy_url_params" in kwargs:
             kwargs.pop("legacy_url_params")
             raise sa_exc.ArgumentError(_LEGACY_URL_PARAMS_REMOVED_MSG)
+        # ``force_div_is_floordiv`` was removed: / always performs true division
+        # and // always performs floor division.  Reject it with an actionable
+        # error instead of silently ignoring it.
+        if "force_div_is_floordiv" in kwargs:
+            kwargs.pop("force_div_is_floordiv")
+            raise sa_exc.ArgumentError(_FORCE_DIV_IS_FLOORDIV_REMOVED_MSG)
 
         super().__init__(isolation_level=isolation_level, **kwargs)  # type: ignore[arg-type]
         # ``DefaultDialect`` does not reliably expose the configured isolation
         # level as an attribute, so keep the constructor value for telemetry.
         self._isolation_level = isolation_level
-        # ``force_div_is_floordiv`` default flipped to False (standard true
-        # division) in the major release.  Explicitly opting back into the legacy
-        # floor-division behaviour is deprecated.
-        if force_div_is_floordiv is None:
-            force_div_is_floordiv = False
-        elif force_div_is_floordiv:
-            warnings.warn(
-                _FORCE_DIV_IS_FLOORDIV_DEPRECATION_MSG,
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        self.force_div_is_floordiv = force_div_is_floordiv
-        self.div_is_floordiv = force_div_is_floordiv
         self._case_sensitive_identifiers = case_sensitive_identifiers
         self.name_utils = _NameUtils(self.identifier_preparer)
         self._enable_decfloat = enable_decfloat
@@ -331,7 +325,6 @@ class SnowflakeDialect(default.DefaultDialect):
 
     def initialize(self, connection: Connection) -> None:
         super().initialize(connection)
-        self.div_is_floordiv = self.force_div_is_floordiv
         if self._redact_log_secrets:
             _ensure_engine_log_redaction()
 

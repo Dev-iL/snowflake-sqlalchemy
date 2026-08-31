@@ -139,7 +139,6 @@ def build_new_connection_payload(dialect: SnowflakeDialect) -> dict[str, Any]:
     telemetry_value["enable_structured_type_json"] = (
         dialect._enable_structured_type_json
     )
-    telemetry_value["force_div_is_floordiv"] = dialect.force_div_is_floordiv
     return telemetry_value
 
 
@@ -165,7 +164,6 @@ def build_connection_parameters_payload(
         # ``cache_column_metadata`` is a connection parameter (not a dialect
         # attribute), so read it from ``cparams`` rather than ``dialect``.
         "cache_column_metadata": bool(cparams.get("cache_column_metadata", False)),
-        "force_div_is_floordiv": dialect.force_div_is_floordiv,
         "isolation_level": getattr(dialect, "_isolation_level", None),
     }
 

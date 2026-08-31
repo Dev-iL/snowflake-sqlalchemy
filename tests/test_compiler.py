@@ -263,50 +263,32 @@ def test_outer_lateral_join():
     )
 
 
-def test_division_operator_with_force_div_is_floordiv_false():
-    col1 = column("col1", Integer)
-    col2 = column("col2", Integer)
-    stmt = col1 / col2
-    assert (
-        str(stmt.compile(dialect=SnowflakeDialect(force_div_is_floordiv=False)))
-        == "col1 / col2"
-    )
-
-
-def test_division_operator_with_denominator_expr_force_div_is_floordiv_false():
-    col1 = column("col1", Integer)
-    col2 = column("col2", Integer)
-    stmt = col1 / func.sqrt(col2)
-    assert (
-        str(stmt.compile(dialect=SnowflakeDialect(force_div_is_floordiv=False)))
-        == "col1 / sqrt(col2)"
-    )
-
-
-def test_division_operator_force_div_is_floordiv_default_false():
-    # New major-release default: force_div_is_floordiv is False, so ``/`` renders
-    # as plain true division without the legacy NUMERIC cast.
+def test_division_operator_true_division():
+    # / always performs true division (Snowflake's native behaviour).
     col1 = column("col1", Integer)
     col2 = column("col2", Integer)
     stmt = col1 / col2
     assert str(stmt.compile(dialect=SnowflakeDialect())) == "col1 / col2"
 
 
-def test_division_operator_with_denominator_expr_force_div_is_floordiv_default_false():
+def test_division_operator_with_denominator_expr():
     col1 = column("col1", Integer)
     col2 = column("col2", Integer)
     stmt = col1 / func.sqrt(col2)
     assert str(stmt.compile(dialect=SnowflakeDialect())) == "col1 / sqrt(col2)"
 
 
-def test_floor_division_operator_force_div_is_floordiv_default_false():
+def test_floor_division_operator_integer():
+    # // always emits FLOOR(left / right), even for Integer/Integer pairs
+    # where SQLAlchemy's base would skip FLOOR if div_is_floordiv=True.
+    # Snowflake's div_is_floordiv is always False, so this is correct.
     col1 = column("col1", Integer)
     col2 = column("col2", Integer)
     stmt = col1 // col2
     assert str(stmt.compile(dialect=SnowflakeDialect())) == "FLOOR(col1 / col2)"
 
 
-def test_floor_division_operator_with_denominator_expr_force_div_is_floordiv_default_false():
+def test_floor_division_operator_with_denominator_expr():
     col1 = column("col1", Integer)
     col2 = column("col2", Integer)
     stmt = col1 // func.sqrt(col2)
@@ -314,40 +296,16 @@ def test_floor_division_operator_with_denominator_expr_force_div_is_floordiv_def
     assert str(res) == "FLOOR(col1 / sqrt(col2))"
 
 
-def test_force_div_is_floordiv_true_is_deprecated_truediv():
-    # force_div_is_floordiv=True is deprecated; it must warn at dialect
-    # construction time.  When set, / honours the flag's stated semantics and
-    # emits FLOOR(left / right) so the caller's explicit request for floor
-    # division is respected (GH #756).
-    col1 = column("col1", Integer)
-    col2 = column("col2", Integer)
-    stmt = col1 / col2
-    with pytest.warns(DeprecationWarning, match="(?i)force_div_is_floordiv"):
-        dialect = SnowflakeDialect(force_div_is_floordiv=True)
-    assert str(stmt.compile(dialect=dialect)) == "FLOOR(col1 / col2)"
+def test_force_div_is_floordiv_raises_argument_error():
+    # force_div_is_floordiv was removed; passing it must raise ArgumentError.
+    import pytest
+    from sqlalchemy.exc import ArgumentError
 
+    with pytest.raises(ArgumentError, match="(?i)force_div_is_floordiv"):
+        SnowflakeDialect(force_div_is_floordiv=True)
 
-def test_force_div_is_floordiv_true_is_deprecated_floordiv_integer():
-    # // on Integer columns must still emit FLOOR(left / right) even when the
-    # deprecated force_div_is_floordiv=True is set.  SQLAlchemy's base skips
-    # FLOOR for integer/integer when div_is_floordiv=True (assuming the DB
-    # floors natively), but Snowflake never floors natively (GH #756).
-    col1 = column("col1", Integer)
-    col2 = column("col2", Integer)
-    stmt = col1 // col2
-    with pytest.warns(DeprecationWarning, match="(?i)force_div_is_floordiv"):
-        dialect = SnowflakeDialect(force_div_is_floordiv=True)
-    assert str(stmt.compile(dialect=dialect)) == "FLOOR(col1 / col2)"
-
-
-def test_force_div_is_floordiv_true_is_deprecated_floordiv_expr():
-    # Same as above but with a non-integer RHS (a function expression).
-    col1 = column("col1", Integer)
-    col2 = column("col2", Integer)
-    stmt = col1 // func.sqrt(col2)
-    with pytest.warns(DeprecationWarning, match="(?i)force_div_is_floordiv"):
-        dialect = SnowflakeDialect(force_div_is_floordiv=True)
-    assert str(stmt.compile(dialect=dialect)) == "FLOOR(col1 / sqrt(col2))"
+    with pytest.raises(ArgumentError, match="(?i)force_div_is_floordiv"):
+        SnowflakeDialect(force_div_is_floordiv=False)
 
 
 class TestMergeIntoBindParameters:
